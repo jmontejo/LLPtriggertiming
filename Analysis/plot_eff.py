@@ -11,9 +11,9 @@ sample = ("n3n4_1TeVsquark_showerLHE","20k","Event.Weight")
 #sample = ("minbias","10k","1")
 #sample = ("minbiasnoelastic","10k","1")
 
-withpufile = TFile.Open("../Delphes-3.4.2/LLPtrigger_samples/%s_withPU55.%s.root"%(sample[0],sample[1]))
+withpufile = TFile.Open("../LLPtrigger_samples/%s_withPU55.%s.root"%(sample[0],sample[1]))
 withputree = withpufile.Get("Delphes")
-zeropufile = TFile.Open("../Delphes-3.4.2/LLPtrigger_samples/%s_zeroPU.%s.root"%(sample[0],sample[1]))
+zeropufile = TFile.Open("../LLPtrigger_samples/%s_zeroPU.%s.root"%(sample[0],sample[1]))
 zeroputree = zeropufile.Get("Delphes")
 
 withputree.SetAlias("rng","sin(2*TMath::Pi()*rndm)*sqrt(-2*log(rndm))")

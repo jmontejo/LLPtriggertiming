@@ -3,12 +3,12 @@ from ROOT import *
 
 gROOT.LoadMacro("getResiduals.C+")
 
-#rfile = TFile.Open("../Delphes-3.4.2/LLPtrigger_samples/n3n4_1TeVsquark_150gev_showerLHE_withPU55.20k.root")
-rfile = TFile.Open("../Delphes-3.4.2/LLPtrigger_samples/n3n4_1TeVsquark_showerLHE_withPU55.20k.root")
-#rfile = TFile.Open("../Delphes-3.4.2/LLPtrigger_samples/n3n4_1TeVsquark_showerLHE_zeroPU.20k.root")
+#rfile = TFile.Open("../LLPtrigger_samples/n3n4_1TeVsquark_150gev_showerLHE_withPU55.20k.root")
+rfile = TFile.Open("../LLPtrigger_samples/n3n4_1TeVsquark_showerLHE_withPU55.20k.root")
+#rfile = TFile.Open("../LLPtrigger_samples/n3n4_1TeVsquark_showerLHE_zeroPU.20k.root")
 tree = rfile.Get("Delphes")
 
-pujets = True
+pujets = False
 tag = "_pu" if pujets else  ""
 ptoffset = 10 if pujets else 0
 
@@ -41,14 +41,14 @@ graph.SetMarkerStyle(20)
 graph.Draw("same")
 px.Draw("same")
 
-canv.SaveAs("h2d%s.png"%tag)
+canv.SaveAs("plots/h2d%s.png"%tag)
 
 stddv.Draw("E")
-canv.SaveAs("stddv%spng"%tag)
+canv.SaveAs("plots/stddv%spng"%tag)
 for i in range(nbins):
     stddv.SetBinContent(i+1, stddv.GetBinContent(i+1)/stddv.GetBinCenter(i+1) )
     stddv.SetBinError(i+1, stddv.GetBinError(i+1)/stddv.GetBinCenter(i+1) )
 myf = TF1("myf","[0]/x+[1]",0,maxpt)
 stddv.Fit("myf")
 stddv.Draw("E")
-canv.SaveAs("relstddv%s.png"%tag)
+canv.SaveAs("plots/relstddv%s.png"%tag)

@@ -25,7 +25,7 @@ Zdisplacementfactor = xAOD.Jet.Decorator('float')('Zdisplacementfactor')
 isN1decay = xAOD.Jet.Decorator('int')('isN1decay')
 
 rnd = TRandom3(123)
-truth2reco_res = TF1("truth2reco_res","[0]/x+[1]",0,1000) #FIXME, assumes GeV
+truth2reco_res = TF1("truth2reco_res","[0]/x+[1]",0,1000)
 truth2reco_res.SetParameters(7.06285e+00, 2.74922e-02)
 reco2l1_res = TF1("reco2l1_res","[0]/x+[1]",0,1000)
 reco2l1_res.SetParameters(1.79319e+01,  4.24584e-02)
@@ -41,12 +41,12 @@ lifetimes = sorted([pow(10,i) for i in range(-1,3)]+[3*pow(10,i) for i in range(
 cuts = ('nominal','delayed_highpt','delayed_ISR','delayed_PU')
 
 def truth2reco(truthpt):
-    recopt = truthpt - 4
+    recopt = truthpt - 4 #in GeV
     recopt *= (1+truth2reco_res.Eval(truthpt)*rnd.Gaus())
     return max(1,recopt)
 
 def reco2hlt(recopt):
-    hltpt = recopt
+    hltpt = recopt #in GeV
     hltpt *= (1+0.02)*rnd.Gaus()
     return hltpt
 

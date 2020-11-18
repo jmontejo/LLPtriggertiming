@@ -81,7 +81,7 @@ thepuline = theline.replace("Jet","JetNoPUcorr")
 thepuline = thepuline.replace(",JetNoPUcorr.Eta","-12,JetNoPUcorr.Eta").replace(",0),Alt$(JetNoPUcorr.Eta","-13,0),Alt$(JetNoPUcorr.Eta")
 print thepuline
 for (sample,weight,pujets) in sampleslist:
-    f = TFile.Open("../Delphes-3.4.2/LLPtrigger_samples/%s.root"%sample)
+    f = TFile.Open("../LLPtrigger_samples/%s.root"%sample)
     tree = f.Get("Delphes")
     tree.SetAlias("rng","sin(2*TMath::Pi()*rndm)*sqrt(-2*log(rndm))")
     if pujets:
