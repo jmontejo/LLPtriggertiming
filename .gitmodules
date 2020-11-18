@@ -1,0 +1,6 @@
+[submodule "Delphes"]
+	path = Delphes
+	url = https://github.com/delphes/delphes.git
+[submodule "Pythia"]
+	path = Pythia
+	url = https://gitlab.com/Pythia8/releases.git
