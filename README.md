@@ -3,10 +3,15 @@
 Studies for LLP triggers using timing in low-HT events
 
 # Installation
+Specify '--recurse-submodules' when cloning, or remember to init+update the submodules
+Delphes should show the tag '3.4.2' and Pythia 'pythia8235'
+
 ```
-cd Pythia && make -j9
-cd ..
-cd Delphes && make HAS_PYTHIA8=true  -j9
+cd Pythia
+make -j9
+cd ../Delphes
+patch -p1 < ../Delphes.patch
+make HAS_PYTHIA8=true  -j9
 cd ..
 ```
 
@@ -18,13 +23,16 @@ cd run_condor
 condor_submit condorSubmit.sub #send 1000 jobs x 6000 events
 # wait for jobs
 cd ../LLPtrigger_samples
-hadd Minbias.root Minbias.10220229.*
-../Delpes/root2pileup Minbias.pileup Minbias.root
+hadd Minbias.merged.root Minbias.10220229.*
+#remove the individual files
+cd ../Delphes
+./root2pileup ../LLPtrigger_samples/Minbias.pileup ../LLPtrigger_samples/Minbias.merged.root
 #at this point can remove Minbias.root
 cd ../run_condor
 #make sure the delphes card points to the correct Minbias.pileup file within Delphes/cards/delphes_card_ATLAS_PileUp.tcl
 condor_submit condorSubmitWithPU.sub #send 1000 jobs x 1000 events
 hadd MinbiasWithPU55.root MinbiasWithPU55.10220303.*
+#remove the individual files
 ```
 
 # Check trigger rates
