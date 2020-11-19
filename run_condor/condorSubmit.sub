@@ -4,4 +4,5 @@ output                = output/generateMinBiasPU.$(ClusterId).$(ProcId).out
 error                 = error/generateMinBiasPU.$(ClusterId).$(ProcId).err
 log                   = log/generateMinBiasPU.$(ClusterId).log
 transfer_output_remaps= "Minbias.$(ClusterId).$(ProcId).root=/eos/home-j/jmontejo/LLPtrigger_samples/Minbias.$(ClusterId).$(ProcId).root"
++JobFlavour = "microcentury"
 queue 1000

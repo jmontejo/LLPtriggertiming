@@ -4,4 +4,5 @@ output                = output/generateMinBiasWithPU.$(ClusterId).$(ProcId).out
 error                 = error/generateMinBiasWithPU.$(ClusterId).$(ProcId).err
 log                   = log/generateMinBiasWithPU.$(ClusterId).log
 transfer_output_remaps= "MinbiasWithPU55.$(ClusterId).$(ProcId).root=/eos/home-j/jmontejo/LLPtrigger_samples/MinbiasWithPU55.$(ClusterId).$(ProcId).root"
++JobFlavour = "longlunch"
 queue 1000

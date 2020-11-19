@@ -7,7 +7,7 @@ export PYTHIA8DATA=/afs/cern.ch/work/j/jmontejo/LLPtriggertiming/Pythia/share/Py
 folder="/afs/cern.ch/user/j/jmontejo/work/LLPtriggertiming/Delphes/"
 mypufile="generateWithPU${seed}.cmnd"
 sed s/"Random:setSeed = 10"/"Random:setSeed = $seed"/g $folder/examples/Pythia8/generatePileUp.cmnd > $mypufile
-sed -i $mypufile 's/numberOfEvents = 100 /numberOfEvents = 1000 /g' #1M events total
+sed -i 's/numberOfEvents = 100 /numberOfEvents = 1000 /g' $mypufile #1M events total
 cat $mypufile
 
 $folder/DelphesPythia8 $folder/cards/delphes_card_ATLAS_PileUp.tcl $mypufile MinbiasWithPU55.${1}.${2}.root

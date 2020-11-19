@@ -22,12 +22,9 @@ Generate individual events to overlay
 cd run_condor
 condor_submit condorSubmit.sub #send 1000 jobs x 6000 events
 # wait for jobs
-cd ../LLPtrigger_samples
-hadd Minbias.merged.root Minbias.10220229.*
-#remove the individual files
 cd ../Delphes
-./root2pileup ../LLPtrigger_samples/Minbias.pileup ../LLPtrigger_samples/Minbias.merged.root
-#at this point can remove Minbias.root
+./root2pileup ../LLPtrigger_samples/Minbias.pileup ../LLPtrigger_samples/Minbias.10220229*
+#at this point can remove the individual Minbias files
 cd ../run_condor
 #make sure the delphes card points to the correct Minbias.pileup file within Delphes/cards/delphes_card_ATLAS_PileUp.tcl
 condor_submit condorSubmitWithPU.sub #send 1000 jobs x 1000 events
