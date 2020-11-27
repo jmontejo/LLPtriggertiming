@@ -11,10 +11,11 @@ Variable = collections.namedtuple('Variable', 'name thevar binning L1jet L1thres
 sampleslist = [
     ("MinbiasWithPU50","Event.Weight",False),
     ("MinbiasWithPU55","Event.Weight",False),
+    ("MinbiasWithPU55.merged","Event.Weight",False),
     ("MinbiasWithPU50","Event.Weight",True),
     ("MinbiasWithPU55","Event.Weight",True),
-    ("n3n4_1TeVsquark_showerLHE_withPU55.20k","Event.Weight",False),
-    ("n3n4_1TeVsquark_showerLHE_zeroPU.20k","Event.Weight",False),
+#    ("n3n4_1TeVsquark_showerLHE_withPU55.20k","Event.Weight",False),
+#    ("n3n4_1TeVsquark_showerLHE_zeroPU.20k","Event.Weight",False),
 #    ("MinbiasInelasticWithPU50","Event.Weight",False),
 #    ("minbias_withPU.10k","Event.Weight",False),
 #    ("minbiasnoelastic_withPU.10k","Event.Weight",False),
@@ -120,10 +121,12 @@ for (sample,weight,pujets) in sampleslist:
         h = TH1D(name,name,*var.binning)
         thevar = var.thevar
         #if pujets: thevar = thevar.replace("Jet","JetNoPUcorr")
+        print name
         tree.Draw("%s >> %s"%(var.thevar,name),weight)
         h.SetDirectory(0)
         hists[var][(sample,pujets)] = h
 
+        #sfs[(sample,pujets)] = (28550/h.Integral(0,-1), 1)
         if var.name == reference:
             if var.name == "pass_4J15":
                 sfs[(sample,pujets)] = (4.8/(h.GetBinContent(2) or 1),  h.GetBinError(2)/(h.GetBinContent(2) or 1))

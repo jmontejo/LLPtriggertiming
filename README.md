@@ -15,6 +15,8 @@ make HAS_PYTHIA8=true  -j9
 cd ..
 ```
 
+For local runs of Delphes `source setup.sh`, for all the analysis plots `source setup_analysis.sh`
+
 # Generate minbias
 
 Generate individual events to overlay
@@ -45,8 +47,12 @@ This is not strictly needed, and not fully correct since I don't do the proper P
 ```
 cd Delphes
 #check the LHE file within examples/Pythia8/configLHE.cmnd
-./DelphesPythia8 cards/delphes_card_ATLAS_PileUp.tcl examples/Pythia8/configLHE.cmnd n3n4_1TeVsquark_150gev_showerLHE_withPU55.20k.root
+./DelphesPythia8 cards/delphes_card_ATLAS_PileUp.tcl examples/Pythia8/configLHE.cmnd ../LLPtrigger_samples/n3n4_1TeVsquark_150gev_showerLHE_withPU55.20k.root
+#set showered file as input for
+python truth_to_reco.py
 ```
+The output plots are the truth-reco calibration and relative resolution
+
 
 # Derive calibrations
 ```

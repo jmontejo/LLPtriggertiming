@@ -4,7 +4,8 @@ from ROOT import *
 gROOT.LoadMacro("getResiduals.C+")
 
 #rfile = TFile.Open("../LLPtrigger_samples/n3n4_1TeVsquark_150gev_showerLHE_withPU55.20k.root")
-rfile = TFile.Open("../LLPtrigger_samples/n3n4_1TeVsquark_showerLHE_withPU55.20k.root")
+#rfile = TFile.Open("../LLPtrigger_samples/n3n4_1TeVsquark_showerLHE_withPU55.20k.root")
+rfile = TFile.Open("../LLPtrigger_samples/n3n4_1TeVsquark_150gev_showerLHE_withPU55.newlyshowered.20k.root")
 #rfile = TFile.Open("../LLPtrigger_samples/n3n4_1TeVsquark_showerLHE_zeroPU.20k.root")
 tree = rfile.Get("Delphes")
 
