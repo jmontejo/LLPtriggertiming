@@ -8,11 +8,14 @@ gROOT.Macro('$ROOTCOREDIR/scripts/load_packages.C')
 # Initialize the xAOD infrastructure
 xAOD.Init()
 
+sample = 'higgs_ss35'
 sample = 'higgsino_150'
 samples = {
     'higgsino_200':"/afs/cern.ch/work/j/jmontejo/LLPtriggertiming/LLPtrigger_samples/n3n4_1TeVsquark_200gev.DAOD_TRUTH3.root",
     'higgsino_150':"/afs/cern.ch/work/j/jmontejo/LLPtriggertiming/LLPtrigger_samples/n3n4_1TeVsquark_150gev.DAOD_TRUTH3.root",
     'higgsino_150_pythiadecay':"/afs/cern.ch/work/j/jmontejo/LLPtriggertiming/LLPtrigger_samples/n3n4_1TeVsquark_150gev_pythiadecay.DAOD_TRUTH3.root",
+    'higgs_ss55': '/afs/cern.ch/work/j/jmontejo/LLPtriggertiming/LLPtrigger_samples/Higgs_to_scalars/mc16_13TeV.311314.MadGraphPythia8EvtGen_A14NNPDF31LO_HSS_LLP_mH125_mS55_ltlow.deriv.DAOD_TRUTH3.e7270_p3401.root', 
+    'higgs_ss35': '/afs/cern.ch/work/j/jmontejo/LLPtriggertiming/LLPtrigger_samples/Higgs_to_scalars/mc15_13TeV.311312.MadGraphPythia8EvtGen_A14NNPDF31LO_HSS_LLP_mH125_mS35_ltlow.deriv.DAOD_TRUTH3.e7270_p3401.root',
 }
 
 rfile = TFile.Open(samples[sample])
@@ -44,8 +47,7 @@ time_cutpoint_high = 12
 #>>> ROOT.Math.normal_cdf_c(2)**2
 #0.0005175685036595646
 fiducial_ranges = {
-    'contained_for_delayed' : ('randzup',(0,1000,300)),
-    'contained_for_delayed' : ('randzup',(0,10000,3000)),
+    'contained_for_delayed' : ('randzup',(0,1000,3000)),
     'vtx_range1' : ('randzup',(4,40,300)),
     'vtx_range2' : ('randzup',(40,100,300)),
     'vtx_range3' : ('randzup',(100,200,300)),
@@ -122,17 +124,25 @@ def getLast(p):
 
 def getDecays(tree):
     toret = []
-    for bsm in tree.TruthBSMWithDecayParticles:
-      if bsm.status()==62:
-        assert bsm.nChildren()==3, bsm.nChildren()
-        child1 = bsm.child(0)
-        child2 = bsm.child(1)
-        child3 = bsm.child(2)
-        bsm4v = bsm.p4()
-        Rdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*sin(bsm4v.Theta()) )
-        Zdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*abs(cos(bsm4v.Theta()) ))
-        toret.append([bsm, child1,child2,child3])
-        if len(toret)==2: break
+    if hasattr(tree,'TruthBSMWithDecayParticles'):
+        for bsm in tree.TruthBSMWithDecayParticles:
+          if bsm.status()==62:
+            assert bsm.nChildren()==3, bsm.nChildren()
+            child1 = bsm.child(0)
+            child2 = bsm.child(1)
+            child3 = bsm.child(2)
+            bsm4v = bsm.p4()
+            Rdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*sin(bsm4v.Theta()) )
+            Zdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*abs(cos(bsm4v.Theta()) ))
+            toret.append([bsm, child1,child2,child3])
+            if len(toret)==2: break
+    else:
+        for bsm in tree.TruthBSM:
+            bsm4v = bsm.p4()
+            Rdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*sin(bsm4v.Theta()) )
+            Zdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*abs(cos(bsm4v.Theta()) ))
+            toret.append([bsm])
+            if len(toret)==2: break
     return toret
 
 def decorateJet(jet, dec1, dec2, todebug=None):
@@ -164,7 +174,9 @@ def decorateJet(jet, dec1, dec2, todebug=None):
             return False
     if n1:
         n14v = n1.p4()
-        delayfactor.set(jet, n14v.Gamma()*(1-n14v.Beta()))
+        delayfactor.set(jet, n14v.Gamma()*(1-n14v.Beta()*cos( n1.phi() -jet.phi() )))
+        #deltal = getDeltaL(jet, n1)
+        #time difference =  gamma*tau(1 - beta*cos) + sqrt( (beta*gamma*tau*sin)^2 + (d/c)^2 )  - d/c
         Rdisplacementfactor.set(jet, n14v.Beta()* n14v.Gamma()*300*sin(n14v.Theta()) )
         Zdisplacementfactor.set(jet, n14v.Beta()* n14v.Gamma()*300*abs(cos(n14v.Theta()) ))
         #print "N1 pt, beta*gamma: ",n1.pt(), n14v.Beta()* n14v.Gamma()
@@ -212,7 +224,7 @@ def llpDisplacementProbability(lifetime, jet, Rmin=0, Rmax=9e9, Zmin=0, Zmax=9e9
     Zdecay = lifetime*Zdisplacementfactor(jet)
     if name == 'randzup':
         probr = exp(- Rmin/Rdecay)-exp(- Rmax/Rdecay)
-        probz = 1.-exp(- Rmax/Rdecay)
+        probz = 1.-exp(- Zmax/Zdecay)
     elif name == 'ronly':
         probr = exp(- Rmin/Rdecay)-exp(- Rmax/Rdecay)
         probz = 1.
@@ -361,8 +373,11 @@ def decorateEvent(tree, llps):
     sortedjets = sorted(tree.AntiKt4TruthDressedWZJets, key=lambda x: recopt(x), reverse=True)
 
     htjetpt = sum([recopt(jet) for jet in tree.AntiKt4TruthDressedWZJets ])
-    leadjetpt = max([recopt(jet) for jet in tree.AntiKt4TruthDressedWZJets ])
-    leadN1jetpt = max([recopt(jet) for jet in tree.AntiKt4TruthDressedWZJets if isN1decay(jet) ])
+    leadjetpt = max([recopt(jet) for jet in tree.AntiKt4TruthDressedWZJets ]) if len(tree.AntiKt4TruthDressedWZJets) else 0
+    if "higgs" in sample:
+        leadN1jetpt = leadjetpt
+    else:
+        leadN1jetpt = max([recopt(jet) for jet in tree.AntiKt4TruthDressedWZJets if isN1decay(jet) ])
     h_htjet.Fill(htjetpt)
     h_leadjet.Fill(leadjetpt)
     h_leadN1jet.Fill(leadN1jetpt)
@@ -376,7 +391,7 @@ def decorateEvent(tree, llps):
         delayed = passDelayed(sortedjets, lifetime)
         delayed2 = passDelayed2(sortedjets, lifetime)
         passl1  = passL1(sortedjets, lifetime)
-        tree.pass_delayed2_PU[lifetime] = passl1*delayed2
+        tree.pass_delayed2_PU[lifetime] = delayed#2 #FIXME passL1 is 40% efficient
         tree.pass_delayed_PU[lifetime] = passl1*delayed
         tree.pass_tracking_PU[lifetime] = passl1*tracking
         tree.pass_CalRatio[lifetime] = passCalRatio(llps,lifetime)
