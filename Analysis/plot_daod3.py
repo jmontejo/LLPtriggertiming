@@ -1,4 +1,4 @@
-from math import exp, sin, cos, log
+from math import exp, sin, cos, log, sqrt
 from ROOT import *
 gROOT.SetBatch(1)
 import array
@@ -8,14 +8,16 @@ gROOT.Macro('$ROOTCOREDIR/scripts/load_packages.C')
 # Initialize the xAOD infrastructure
 xAOD.Init()
 
-sample = 'higgs_ss35'
 sample = 'higgsino_150'
+sample = 'higgs_ss35'
+sample = 'my_hss35'
 samples = {
     'higgsino_200':"/afs/cern.ch/work/j/jmontejo/LLPtriggertiming/LLPtrigger_samples/n3n4_1TeVsquark_200gev.DAOD_TRUTH3.root",
     'higgsino_150':"/afs/cern.ch/work/j/jmontejo/LLPtriggertiming/LLPtrigger_samples/n3n4_1TeVsquark_150gev.DAOD_TRUTH3.root",
     'higgsino_150_pythiadecay':"/afs/cern.ch/work/j/jmontejo/LLPtriggertiming/LLPtrigger_samples/n3n4_1TeVsquark_150gev_pythiadecay.DAOD_TRUTH3.root",
     'higgs_ss55': '/afs/cern.ch/work/j/jmontejo/LLPtriggertiming/LLPtrigger_samples/Higgs_to_scalars/mc16_13TeV.311314.MadGraphPythia8EvtGen_A14NNPDF31LO_HSS_LLP_mH125_mS55_ltlow.deriv.DAOD_TRUTH3.e7270_p3401.root', 
     'higgs_ss35': '/afs/cern.ch/work/j/jmontejo/LLPtriggertiming/LLPtrigger_samples/Higgs_to_scalars/mc15_13TeV.311312.MadGraphPythia8EvtGen_A14NNPDF31LO_HSS_LLP_mH125_mS35_ltlow.deriv.DAOD_TRUTH3.e7270_p3401.root',
+    'my_hss35': '/eos/home-j/jmontejo/LLPtrigger_samples/Higgs_to_scalars/run/DAOD_TRUTH3.mc16_13TeV.311312.MadGraphPythia8EvtGen_A14NNPDF31LO_HSS_LLP_mH125_mS35_ltlow.root',
 }
 
 rfile = TFile.Open(samples[sample])
@@ -23,6 +25,7 @@ tree  = xAOD.MakeTransientTree(rfile, "CollectionTree")
 recopt = xAOD.Jet.Decorator('float')('recopt')
 l1pt = xAOD.Jet.Decorator('float')('l1pt')
 delayfactor = xAOD.Jet.Decorator('float')('delayfactor')
+n1index = xAOD.Jet.Decorator('int')('n1index')
 Rdisplacementfactor = xAOD.Jet.Decorator('float')('Rdisplacementfactor')
 Zdisplacementfactor = xAOD.Jet.Decorator('float')('Zdisplacementfactor')
 isN1decay = xAOD.Jet.Decorator('int')('isN1decay')
@@ -36,16 +39,18 @@ nbins = 25
 gev = 1e-3
 maxht = 800
 maxjetpt = 500
-time_cutpoint = 2
+#time_cutpoint = 2
 time_cutpoint_high = 12
 #>>> ROOT.Math.normal_cdf_c(1)
 #0.15865525393145707
 #>>> ROOT.Math.normal_cdf_c(2)
-#0.022750131948179216
+#0.022750131948179216 (*6kHz input = 136 Hz)
 #>>> ROOT.Math.normal_cdf_c(1)**2
 #0.025171489600055125
 #>>> ROOT.Math.normal_cdf_c(2)**2
-#0.0005175685036595646
+#0.0005175685036595646 (*6kHz input = 3 Hz)
+#>>> ROOT.Math.normal_cdf_c(1.5)**2
+#0.004463202141377714 (*6kHz input = 27 Hz)
 fiducial_ranges = {
     'contained_for_delayed' : ('randzup',(0,1000,3000)),
     'vtx_range1' : ('randzup',(4,40,300)),
@@ -88,16 +93,19 @@ def calratioBarrelREfficiency(llp, lifetime):
     return eff
 
 def calratioPtEfficiency(LLPpt):
-    if LLPpt<20: return 0
-    if LLPpt>260: return 0.8
-    return log((LLPpt-20)/10.)/4.
+    minpt = 20
+    factor = 1
+    if LLPpt<minpt: return 0
+    if LLPpt>260: return 0.8/factor
+    return log((LLPpt-minpt)/10.)/(4.*factor)
 
 def vtxEfficiency(lifetime, llp):
+    ff = 0.55
     eff = 0
-    eff += 0.9*llpDisplacementProbability(lifetime, llp, fiducial_range='vtx_range1')
-    eff += 0.8*llpDisplacementProbability(lifetime, llp, fiducial_range='vtx_range2')
-    eff += 0.7*llpDisplacementProbability(lifetime, llp, fiducial_range='vtx_range3')
-    eff += 0.5*llpDisplacementProbability(lifetime, llp, fiducial_range='vtx_range4')
+    eff += 0.9*ff*llpDisplacementProbability(lifetime, llp, fiducial_range='vtx_range1')
+    eff += 0.8*ff*llpDisplacementProbability(lifetime, llp, fiducial_range='vtx_range2')
+    eff += 0.7*ff*llpDisplacementProbability(lifetime, llp, fiducial_range='vtx_range3')
+    eff += 0.5*ff*llpDisplacementProbability(lifetime, llp, fiducial_range='vtx_range4')
     assert eff<1, eff
     return eff
 
@@ -126,16 +134,16 @@ def getDecays(tree):
     toret = []
     if hasattr(tree,'TruthBSMWithDecayParticles'):
         for bsm in tree.TruthBSMWithDecayParticles:
-          if bsm.status()==62:
-            assert bsm.nChildren()==3, bsm.nChildren()
-            child1 = bsm.child(0)
-            child2 = bsm.child(1)
-            child3 = bsm.child(2)
-            bsm4v = bsm.p4()
-            Rdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*sin(bsm4v.Theta()) )
-            Zdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*abs(cos(bsm4v.Theta()) ))
-            toret.append([bsm, child1,child2,child3])
-            if len(toret)==2: break
+          if 'higgsino' in sample and bsm.status()==62:
+            toret.append([bsm])
+          elif 'hss' in sample and bsm.status()==22:
+            toret.append([bsm])
+          else: continue
+          toret[-1].extend([bsm.child(i) for i in range(bsm.nChildren())])
+          bsm4v = bsm.p4()
+          Rdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*sin(bsm4v.Theta()) )
+          Zdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*abs(cos(bsm4v.Theta()) ))
+          if len(toret)==2: break
     else:
         for bsm in tree.TruthBSM:
             bsm4v = bsm.p4()
@@ -150,27 +158,28 @@ def decorateJet(jet, dec1, dec2, todebug=None):
     l1pt.set(jet, reco2l1(recopt(jet)) )
     flav = jet.auxdataConst['int']('TrueFlavor') 
     dr1, dr2 = 9, 9
-    ppt = 0
     for p in dec1:
         if p.pdgId() == flav: 
             dr1 = p.p4().DeltaR(jet.p4())
-            ppt = p.pt()
             break
     for p in dec2:
         if p.pdgId() == flav: 
             dr2 = p.p4().DeltaR(jet.p4())
-            ppt = p.pt()
             break
+
     n1 = None
     if dr1 < dr2 and dr1<0.6:
         n1 = dec1[0]
+        n1index.set(jet, 0 )
     elif dr2 < dr1 and dr2<0.6:
         n1 = dec2[0]
+        n1index.set(jet, 1 )
     elif min(dr1,dr2) < 9 and min(dr1,dr2>0.6):
-        if todebug.count(flav) <=2:
+        if 'higgsino' in sample and todebug.count(flav) <=2:
             #print "No good dR matching",dr1,dr2,flav,jet.pt(),jet.eta(),jet.phi(),[(p.pdgId(), p.pt(), p.eta(),p.phi()) for p in dec1+dec2 if p.pdgId()==flav]
-            #print "Bad ratio",jet.pt()/ppt
             #print todebug
+            return False
+        if 'hss' in sample and todebug.count(flav) <=4:
             return False
     if n1:
         n14v = n1.p4()
@@ -198,7 +207,7 @@ def decorateJet(jet, dec1, dec2, todebug=None):
 # - nominal L1 + displaced HLT trigger cut B (jet pT > 2xx gev + jet pT > 40 and jet time > 2 sigma) ISR + delayed
 # - pileup L1 + displaced HLT trigger cut (pass L1 and jet time > 2 sigma) pass L1 = weight event by the prob that it passes L1 adding to PU
 
-def llpDelayProbability(lifetime, delayfactor):
+def llpDelayProbability(lifetime, delayfactor, time_cutpoint):
     if delayfactor==0: return 0 #if not delay cannot pass
     #integral of a normalized exponential with tau*delayfactor, from cutpoint to cutpoint_high
     return exp(- time_cutpoint/(lifetime*delayfactor)) -exp(- time_cutpoint_high/(lifetime*delayfactor))
@@ -243,13 +252,14 @@ def passNominal(sortedjets, lifetime):
         nonepass *= 1- llpDisplacementProbability(lifetime, jet, fiducial_range='contained_for_delayed')
     return 1 - nonepass
 
-def passDelayedHighPt(sortedjets, lifetime):
-    return passDelayed(sortedjets, lifetime, 220)
+def passDelayedHighPt(sortedjets, lifetime, llps):
+    return passDelayed(sortedjets, lifetime, 220, llps)
 
-def passCalRatio(llps, lifetime):
+def passCalRatio(leadjetpt, llps, lifetime):
+    if leadjetpt < 60: return 0
     nonepass  = 1 #will do 1-probability that none pass
     for llp in llps:
-        pteff = calratioPtEfficiency(llp.pt())
+        pteff = calratioPtEfficiency(llp.pt()*gev)
         if abs(llp.eta())<1.4:
             poseff = calratioBarrelREfficiency(llp, lifetime)
         elif abs(llp.eta())<2.5:
@@ -259,11 +269,11 @@ def passCalRatio(llps, lifetime):
         nonepass *= 1- pteff*poseff
     return 1 - nonepass
 
-def passDelayedISR(sortedjets, lifetime):
+def passDelayedISR(sortedjets, lifetime, llps):
     maxprob = 0
     for i1,jet1 in enumerate(sortedjets):
       if recopt(jet1) < 220: break
-      maxprob = max(maxprob, passDelayed(sortedjets, lifetime) )
+      maxprob = max(maxprob, passDelayed(sortedjets, lifetime, llps=llps) )
     return maxprob
 
 def countL1J(sortedjets, l1ptcut):
@@ -325,20 +335,22 @@ def passTracking(llps, lifetime):
     hltprob = 1-nonepass
     return hltprob
 
-def passDelayed2(sortedjets, lifetime, ptcut=40):
+def passDelayed2(sortedjets, lifetime, ptcut=40, llps=None):
     nonepass  = 1 #will do 1-probability that none pass
     seenfactors = {}
     for i1,jet1 in enumerate(sortedjets):
       if recopt(jet1) < ptcut: break
-      factor1 = delayfactor(jet1)
+      n1factor1 = delayfactor(jet1)
+      factor1 = getDelayFactor(jet1, llps, lifetime) if llps else delayfactor(jet1)
       for i2 in range(i1+1, len(sortedjets)):
         jet2 = sortedjets[i2]
         if recopt(jet2) < ptcut: break
-        factor2 = delayfactor(jet2)
-        prob1 =  llpDelayProbability(lifetime, delayfactor(jet1) )*llpDisplacementProbability(lifetime, jet1, fiducial_range='contained_for_delayed')
-        prob2 =  llpDelayProbability(lifetime, delayfactor(jet2) )*llpDisplacementProbability(lifetime, jet2, fiducial_range='contained_for_delayed')
+        n1factor2 = delayfactor(jet2)
+        factor2 = getDelayFactor(jet2, llps, lifetime) if llps else delayfactor(jet2)
+        prob1 =  llpDelayProbability(lifetime, factor1, 1.5 )*llpDisplacementProbability(lifetime, jet1, fiducial_range='contained_for_delayed')
+        prob2 =  llpDelayProbability(lifetime, factor2, 1.5 )*llpDisplacementProbability(lifetime, jet2, fiducial_range='contained_for_delayed')
         prob = prob1*prob2
-        factor = (factor1, factor2)
+        factor = (n1factor1, n1factor2)
         if factor not in seenfactors or prob > seenfactors[factor]:
           seenfactors[factor] = prob
     for p in seenfactors.values():
@@ -346,14 +358,29 @@ def passDelayed2(sortedjets, lifetime, ptcut=40):
     hltprob = 1-nonepass
     return hltprob
 
+def getDelayFactor(jet, llps, lifetime):
+    n1 = llps[ n1index(jet) ]
+    n14v = n1.p4()
+    length = 1500
+    c = 300
+    timediff = n14v.Gamma()*lifetime*(1-n14v.Beta()*cos( n1.phi() -jet.phi() )) + \
+               sqrt( pow(n14v.Beta()*n14v.Gamma()*lifetime*sin( n1.phi() -jet.phi() ), 2) + pow(length/c,2) ) - length/c
+    return timediff/lifetime
+    
+    #time difference =  gamma*tau(1 - beta*cos) + sqrt( (beta*gamma*tau*sin)^2 + (d/c)^2 )  - d/c
 
-def passDelayed(sortedjets, lifetime, ptcut=40):
+
+def passDelayed(sortedjets, lifetime, ptcut=40, llps=None):
     nonepass  = 1 #will do 1-probability that none pass
     seenfactors = {}
     for jet in sortedjets:
       if recopt(jet) < ptcut: break
       factor = delayfactor(jet)
-      prob =  llpDelayProbability(lifetime, delayfactor(jet) )*llpDisplacementProbability(lifetime, jet, fiducial_range='contained_for_delayed')
+
+      if llps:
+          prob =  llpDelayProbability(lifetime, getDelayFactor(jet, llps, lifetime), 2 )*llpDisplacementProbability(lifetime, jet, fiducial_range='contained_for_delayed')
+      else:
+          prob =  llpDelayProbability(lifetime, factor, 2)*llpDisplacementProbability(lifetime, jet, fiducial_range='contained_for_delayed')
       if factor not in seenfactors or prob > seenfactors[factor]:
         seenfactors[factor] = prob
     for p in seenfactors.values():
@@ -373,11 +400,12 @@ def decorateEvent(tree, llps):
     sortedjets = sorted(tree.AntiKt4TruthDressedWZJets, key=lambda x: recopt(x), reverse=True)
 
     htjetpt = sum([recopt(jet) for jet in tree.AntiKt4TruthDressedWZJets ])
-    leadjetpt = max([recopt(jet) for jet in tree.AntiKt4TruthDressedWZJets ]) if len(tree.AntiKt4TruthDressedWZJets) else 0
-    if "higgs" in sample:
-        leadN1jetpt = leadjetpt
-    else:
-        leadN1jetpt = max([recopt(jet) for jet in tree.AntiKt4TruthDressedWZJets if isN1decay(jet) ])
+    leadjetpt, leadN1jetpt = 0, 0
+    if  len(tree.AntiKt4TruthDressedWZJets):
+        leadjetpt = max([recopt(jet) for jet in tree.AntiKt4TruthDressedWZJets ])
+        n1jets = [recopt(jet) for jet in tree.AntiKt4TruthDressedWZJets if isN1decay(jet) ]
+        if len(n1jets):
+            leadN1jetpt = max(n1jets)
     h_htjet.Fill(htjetpt)
     h_leadjet.Fill(leadjetpt)
     h_leadN1jet.Fill(leadN1jetpt)
@@ -385,16 +413,16 @@ def decorateEvent(tree, llps):
     for lifetime in lifetimes:
         tree.pass_nominal[lifetime] = passNominal(sortedjets, lifetime)
 
-        tree.pass_delayed_highpt[lifetime] = passDelayedHighPt(sortedjets, lifetime)
-        tree.pass_delayed_ISR[lifetime] = passDelayedISR(sortedjets, lifetime)
+        tree.pass_delayed_highpt[lifetime] = passDelayedHighPt(sortedjets, lifetime, llps)
+        tree.pass_delayed_ISR[lifetime] = passDelayedISR(sortedjets, lifetime, llps)
         tracking = passTracking(llps, lifetime)
-        delayed = passDelayed(sortedjets, lifetime)
-        delayed2 = passDelayed2(sortedjets, lifetime)
+        delayed = passDelayed(sortedjets, lifetime, llps=llps)
+        delayed2 = passDelayed2(sortedjets, lifetime, llps=llps)
         passl1  = passL1(sortedjets, lifetime)
-        tree.pass_delayed2_PU[lifetime] = delayed#2 #FIXME passL1 is 40% efficient
+        tree.pass_delayed2_PU[lifetime] = passl1*delayed2
         tree.pass_delayed_PU[lifetime] = passl1*delayed
         tree.pass_tracking_PU[lifetime] = passl1*tracking
-        tree.pass_CalRatio[lifetime] = passCalRatio(llps,lifetime)
+        tree.pass_CalRatio[lifetime] = passCalRatio(leadjetpt, llps,lifetime)
         #if leadN1jetpt > 220:
         #  if tree.pass_delayed_ISR[lifetime]> tree.pass_delayed_highpt[lifetime]:
         #    print  tree.pass_delayed_ISR[lifetime],tree.pass_delayed_highpt[lifetime], delayed
@@ -449,7 +477,13 @@ def main():
         if i%1000==0: print i
         tree.GetEntry(i)
         dec1, dec2 = getDecays(tree)
-        pdgs = [jet.auxdataConst['int']('TrueFlavor') for jet in tree.AntiKt4TruthDressedWZJets if jet.auxdataConst['int']('TrueFlavor')<4]
+        if 'higgsino' in sample:
+            pdgs = [jet.auxdataConst['int']('TrueFlavor') for jet in tree.AntiKt4TruthDressedWZJets if jet.auxdataConst['int']('TrueFlavor')<4]
+        elif 'hss' in sample:
+            pdgs = [jet.auxdataConst['int']('TrueFlavor') for jet in tree.AntiKt4TruthDressedWZJets if jet.auxdataConst['int']('TrueFlavor')==5]
+        else:
+            raise ImplementMe
+
         for jet in tree.AntiKt4TruthDressedWZJets:
             ok = decorateJet(jet,dec1,dec2,pdgs)
             if not ok: break
