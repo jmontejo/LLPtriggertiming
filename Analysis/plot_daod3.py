@@ -52,6 +52,7 @@ time_cutpoint_high = 12
 #>>> ROOT.Math.normal_cdf_c(1.5)**2
 #0.004463202141377714 (*6kHz input = 27 Hz)
 fiducial_ranges = {
+    'contained_for_delayedL1' : ('randzup',(0,2000,3000)),
     'contained_for_delayed' : ('randzup',(0,1000,3000)),
     'vtx_range1' : ('randzup',(4,40,300)),
     'vtx_range2' : ('randzup',(40,100,300)),
@@ -65,7 +66,6 @@ fiducial_ranges = {
     'calratio_endcap_range3' : ('zonly',(5400,5800)),
 }
 lifetimes = sorted([pow(10,i) for i in range(-2,3)]+[3*pow(10,i) for i in range(-2,3)])
-cuts = ('nominal','delayed_highpt','delayed_ISR','delayed_PU','delayed2_PU','tracking_PU','CalRatio')
 
 h_lifetime = TH1F('h_lifetime','h_lifetime',len(lifetimes),array.array('f',[0]+[l*2 for l in lifetimes]))
 h_htjet = TH1F('h_htjet','h_htjet',nbins,0,maxht)
@@ -232,7 +232,7 @@ def llpDisplacementProbability(lifetime, jetorllp, Rmin=0, Rmax=9e9, Zmin=0, Zma
         return 1
     raise WTFError
 
-def passNominal(sortedjets, lifetime):
+def passNominal(sortedjets, lifetime, unused):
     for jet in sortedjets:
         if recopt(jet) < 450: break
         if llpDisplacementProbability(lifetime, jet, fiducial_range='contained_for_delayed'):
@@ -263,7 +263,7 @@ def passDelayedISR(sortedjets, lifetime, llps):
 def countL1J(sortedjets, l1ptcut, lifetime):
     count = 0
     for jet in sortedjets:
-        if not llpDisplacementProbability(lifetime, jet, fiducial_range='contained_for_delayed'): continue
+        if not llpDisplacementProbability(lifetime, jet, fiducial_range='contained_for_delayedL1'): continue
         count += (l1pt(jet) > l1ptcut)
     return count
 
@@ -409,6 +409,16 @@ def decorateEvent(tree, llps):
         h_passlifetime['tracking_PU'].Fill(lifetime, tree.pass_tracking_PU[lifetime])
 
 def main():
+    cuts = {
+        'nominal':         passNominal,
+        'delayed_highpt':  passDelayedHighPt,
+        'delayed_ISR':     passDelayedISR,
+        'delayed_PU':      passDelayed1,
+        'delayed2_PU':     passDelayed2,
+        'delayed3_PU':     passDelayed3,
+        'tracking_PU':     passTracking,
+        'CalRatio'         passCalRatio
+    }
     for cut in cuts:
         h_passlifetime[cut] =  TH1F('h_lifetime'+cut,'h_lifetime'+cut,len(lifetimes),array.array('f',[0]+[l*2 for l in lifetimes]))
         h_passhtjet[cut] = {}
