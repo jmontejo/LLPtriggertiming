@@ -8,9 +8,9 @@ gROOT.Macro('$ROOTCOREDIR/scripts/load_packages.C')
 # Initialize the xAOD infrastructure
 xAOD.Init()
 
-sample = 'higgsino_150'
 sample = 'higgs_ss35'
 sample = 'my_hss35'
+sample = 'higgsino_200'
 samples = {
     'higgsino_200':"/afs/cern.ch/work/j/jmontejo/LLPtriggertiming/LLPtrigger_samples/n3n4_1TeVsquark_200gev.DAOD_TRUTH3.root",
     'higgsino_150':"/afs/cern.ch/work/j/jmontejo/LLPtriggertiming/LLPtrigger_samples/n3n4_1TeVsquark_150gev.DAOD_TRUTH3.root",
@@ -24,7 +24,7 @@ rfile = TFile.Open(samples[sample])
 tree  = xAOD.MakeTransientTree(rfile, "CollectionTree")
 recopt = xAOD.Jet.Decorator('float')('recopt')
 l1pt = xAOD.Jet.Decorator('float')('l1pt')
-delayfactor = xAOD.Jet.Decorator('float')('delayfactor')
+decaytime = xAOD.Jet.Decorator('float')('decaytime')
 n1index = xAOD.Jet.Decorator('int')('n1index')
 Rdisplacementfactor = xAOD.Jet.Decorator('float')('Rdisplacementfactor')
 Zdisplacementfactor = xAOD.Jet.Decorator('float')('Zdisplacementfactor')
@@ -81,7 +81,7 @@ def calratioEndcapZEfficiency(llp, lifetime):
     eff += 0.5*llpDisplacementProbability(lifetime, llp, fiducial_range='calratio_endcap_range1')
     eff += 1.0*llpDisplacementProbability(lifetime, llp, fiducial_range='calratio_endcap_range2')
     eff += 0.5*llpDisplacementProbability(lifetime, llp, fiducial_range='calratio_endcap_range3')
-    assert eff<1, eff
+    assert eff<=1, eff
     return eff
 
 def calratioBarrelREfficiency(llp, lifetime):
@@ -89,7 +89,7 @@ def calratioBarrelREfficiency(llp, lifetime):
     eff += 0.5*llpDisplacementProbability(lifetime, llp, fiducial_range='calratio_barrel_range1')
     eff += 1.0*llpDisplacementProbability(lifetime, llp, fiducial_range='calratio_barrel_range2')
     eff += 0.5*llpDisplacementProbability(lifetime, llp, fiducial_range='calratio_barrel_range3')
-    assert eff<1, eff
+    assert eff<=1, eff
     return eff
 
 def calratioPtEfficiency(LLPpt):
@@ -141,8 +141,8 @@ def getDecays(tree):
       toret[-1].extend([bsm.child(i) for i in range(bsm.nChildren())])
       bsm4v = bsm.p4()
       decaytime.set(bsm, rnd.Exp(1) )
-      Rdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*sin(bsm4v.Theta()) )
-      Zdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*abs(cos(bsm4v.Theta()) ))
+      Rdisplacementfactor.set(bsm, decaytime(bsm)*bsm4v.Beta()* bsm4v.Gamma()*300*sin(bsm4v.Theta()) )
+      Zdisplacementfactor.set(bsm, decaytime(bsm)*bsm4v.Beta()* bsm4v.Gamma()*300*abs(cos(bsm4v.Theta()) ))
       if len(toret)==2: break
     return toret
 
@@ -175,6 +175,13 @@ def decorateJet(jet, dec1, dec2, pdgs=None):
         if 'hss' in sample and pdgs.count(flav) <=4:
             return False
     if n1:
+        #n14v = n1.p4()
+        #delayfactor.set(jet, n14v.Gamma()*(1-n14v.Beta()*cos( n1.phi() -jet.phi() )))
+        #deltal = getDeltaL(jet, n1)
+        #time difference =  gamma*tau(1 - beta*cos) + sqrt( (beta*gamma*tau*sin)^2 + (d/c)^2 )  - d/c
+        Rdisplacementfactor.set(jet, Rdisplacementfactor(n1) )
+        Zdisplacementfactor.set(jet, Zdisplacementfactor(n1) )
+        #print "N1 pt, beta*gamma: ",n1.pt(), n14v.Beta()* n14v.Gamma()
         isN1decay.set(jet, 1 )
     else:
         isN1decay.set(jet, 0 )
@@ -192,11 +199,11 @@ def decorateJet(jet, dec1, dec2, pdgs=None):
 
 def llpDelayProbability(delay, time_cutpoint):
     if delay==0: return 0 #if not delay cannot pass
-    #integral of a normalized exponential with tau*delayfactor, from cutpoint to cutpoint_high
-    return exp(- time_cutpoint/delay) -exp(- time_cutpoint_high/delay)
+    if delay < time_cutpoint or delay > time_cutpoint_high: return 0
+    return 1
 
-def llpDisplacementProbability(lifetime, jet, Rmin=0, Rmax=9e9, Zmin=0, Zmax=9e9, fiducial_range=None):
-    if Rdisplacementfactor(jet)==0:
+def llpDisplacementProbability(lifetime, jetorllp, Rmin=0, Rmax=9e9, Zmin=0, Zmax=9e9, fiducial_range=None):
+    if Rdisplacementfactor(jetorllp)==0:
         if (Rmin or Zmin): return 0
         if not Rmin and not Zmin: return 1
         print "WTF",Rmin,Zmin
@@ -211,29 +218,26 @@ def llpDisplacementProbability(lifetime, jet, Rmin=0, Rmax=9e9, Zmin=0, Zmax=9e9
         else:
             print  "WTF",fiducial_ranges[fiducial_range]
 
-    #integral of a normalized exponential with tau*delayfactor, from cutpoint to cutpoint_high
-    Rdecay = lifetime*Rdisplacementfactor(jet)
-    Zdecay = lifetime*Zdisplacementfactor(jet)
+    Rdecay = lifetime*Rdisplacementfactor(jetorllp)
+    Zdecay = lifetime*Zdisplacementfactor(jetorllp)
     if name == 'randzup':
-        probr = exp(- Rmin/Rdecay)-exp(- Rmax/Rdecay)
-        probz = 1.-exp(- Zmax/Zdecay)
+        if Rdecay < Rmin or Rdecay > Rmax: return 0
+        if Zdecay > Zmax: return 0
+        return 1
     elif name == 'ronly':
-        probr = exp(- Rmin/Rdecay)-exp(- Rmax/Rdecay)
-        probz = 1.
+        if Rdecay < Rmin or Rdecay > Rmax: return 0
+        return 1
     elif name == 'zonly':
-        probr = 1.
-        probz = exp(- Zmin/Zdecay)-exp(- Zmax/Zdecay)
-    #print lifetime, Rdecay,Zdecay
-    #print fiducial_ranges[fiducial_range]
-    #print probr, probz
-    return probr*probz
+        if Zdecay < Zmin or Zdecay > Zmax: return 0
+        return 1
+    raise WTFError
 
 def passNominal(sortedjets, lifetime):
-    nonepass  = 1 #will do 1-probability that none pass
     for jet in sortedjets:
         if recopt(jet) < 450: break
-        nonepass *= 1- llpDisplacementProbability(lifetime, jet, fiducial_range='contained_for_delayed')
-    return 1 - nonepass
+        if llpDisplacementProbability(lifetime, jet, fiducial_range='contained_for_delayed'):
+            return 1
+    return 0
 
 def passDelayedHighPt(sortedjets, lifetime, llps):
     return passDelayed(sortedjets, lifetime, 220, llps)
@@ -253,15 +257,13 @@ def passCalRatio(leadjetpt, llps, lifetime):
     return 1 - nonepass
 
 def passDelayedISR(sortedjets, lifetime, llps):
-    maxprob = 0
-    for i1,jet1 in enumerate(sortedjets):
-      if recopt(jet1) < 220: break
-      maxprob = max(maxprob, passDelayed(sortedjets, lifetime, llps=llps) )
-    return maxprob
+    if len(sortedjets)==0 or recopt(sortedjets[0]) < 220: return 0
+    return passDelayed(sortedjets, lifetime, llps)
 
-def countL1J(sortedjets, l1ptcut):
+def countL1J(sortedjets, l1ptcut, lifetime):
     count = 0
     for jet in sortedjets:
+        if not llpDisplacementProbability(lifetime, jet, fiducial_range='contained_for_delayed'): continue
         count += (l1pt(jet) > l1ptcut)
     return count
 
@@ -294,8 +296,8 @@ def passL1(sortedjets, lifetime):
     weight_3J15_pu = 27.1/28550
     weight_2J15_pu = 170./28550 #guess
     weight_J15_pu  = 1101./28550
-    countJ15  = countL1J(sortedjets,15)
-    countJ100 = countL1J(sortedjets,100)
+    countJ15  = countL1J(sortedjets,15,lifetime)
+    countJ100 = countL1J(sortedjets,100,lifetime)
 
     weight_J100, weight_4J15 = 0,0
     if countJ100: weight_J100 = 1
@@ -318,55 +320,26 @@ def passTracking(llps, lifetime):
     hltprob = 1-nonepass
     return hltprob
 
-def passDelayed2(sortedjets, lifetime, ptcut=40, llps=None):
-    nonepass  = 1 #will do 1-probability that none pass
-    seenfactors = {}
-    for i1,jet1 in enumerate(sortedjets):
-      if recopt(jet1) < ptcut: break
-      n1factor1 = delayfactor(jet1)
-      factor1 = getDelay(jet1, llps, lifetime) if llps else delayfactor(jet1)
-      for i2 in range(i1+1, len(sortedjets)):
-        jet2 = sortedjets[i2]
-        if recopt(jet2) < ptcut: break
-        n1factor2 = delayfactor(jet2)
-        factor2 = getDelay(jet2, llps, lifetime) if llps else delayfactor(jet2)
-        prob1 =  llpDelayProbability(lifetime, factor1, 1.5 )*llpDisplacementProbability(lifetime, jet1, fiducial_range='contained_for_delayed')
-        prob2 =  llpDelayProbability(lifetime, factor2, 1.5 )*llpDisplacementProbability(lifetime, jet2, fiducial_range='contained_for_delayed')
-        prob = prob1*prob2
-        factor = (n1factor1, n1factor2)
-        if factor not in seenfactors or prob > seenfactors[factor]:
-          seenfactors[factor] = prob
-    for p in seenfactors.values():
-      nonepass *= 1- p
-    hltprob = 1-nonepass
-    return hltprob
-
 def getDelay(jet, llps, lifetime):
     n1 = llps[ n1index(jet) ]
     n14v = n1.p4()
     length = 1500
     c = 300
-    timediff = n14v.Gamma()*lifetime*(1-n14v.Beta()*cos( n1.phi() -jet.phi() )) + \
-               sqrt( pow(n14v.Beta()*n14v.Gamma()*lifetime*sin( n1.phi() -jet.phi() ), 2) + pow(length/c,2) ) - length/c
+    decayt = lifetime*decaytime(n1)
+    timediff = n14v.Gamma()*decayt*(1-n14v.Beta()*cos( n1.phi() -jet.phi() )) + \
+               sqrt( pow(n14v.Beta()*n14v.Gamma()*decayt*sin( n1.phi() -jet.phi() ), 2) + pow(length/c,2) ) - length/c
     return timediff
     
     #time difference =  gamma*tau(1 - beta*cos) + sqrt( (beta*gamma*tau*sin)^2 + (d/c)^2 )  - d/c
 
 
-def passDelayed(sortedjets, lifetime, ptcut=40, llps=None):
-    nonepass  = 1 #will do 1-probability that none pass
-    seenfactors = {}
+def passDelayed(sortedjets, lifetime, ptcut=40, llps=None, count=1, timecut=2):
+    dopass = 0
     for jet in sortedjets:
       if recopt(jet) < ptcut: break
-      factor = delayfactor(jet)
-
-      prob =  llpDelayProbability(lifetime, getDelay(jet, llps, lifetime), 2 )*llpDisplacementProbability(lifetime, jet, fiducial_range='contained_for_delayed')
-      if factor not in seenfactors or prob > seenfactors[factor]:
-        seenfactors[factor] = prob
-    for p in seenfactors.values():
-      nonepass *= 1- p
-    hltprob = 1-nonepass
-    return hltprob
+      dopass +=  llpDelayProbability(getDelay(jet, llps, lifetime), timecut )*llpDisplacementProbability(lifetime, jet, fiducial_range='contained_for_delayed')
+      if dopass == count: return 1
+    return 0
 
 def decorateEvent(tree, llps):
     tree.pass_nominal = {}
@@ -397,18 +370,12 @@ def decorateEvent(tree, llps):
         tree.pass_delayed_ISR[lifetime] = passDelayedISR(sortedjets, lifetime, llps)
         tracking = passTracking(llps, lifetime)
         delayed = passDelayed(sortedjets, lifetime, llps=llps)
-        delayed2 = passDelayed2(sortedjets, lifetime, llps=llps)
+        delayed2 = passDelayed(sortedjets, lifetime, llps=llps, count=2, timecut=1.5)
         passl1  = passL1(sortedjets, lifetime)
         tree.pass_delayed2_PU[lifetime] = passl1*delayed2
         tree.pass_delayed_PU[lifetime] = passl1*delayed
         tree.pass_tracking_PU[lifetime] = passl1*tracking
         tree.pass_CalRatio[lifetime] = passCalRatio(leadjetpt, llps,lifetime)
-        #if leadN1jetpt > 220:
-        #  if tree.pass_delayed_ISR[lifetime]> tree.pass_delayed_highpt[lifetime]:
-        #    print  tree.pass_delayed_ISR[lifetime],tree.pass_delayed_highpt[lifetime], delayed
-        #    for jet in sortedjets:
-        #        print recopt(jet), delayfactor(jet), llpDelayProbability(lifetime, delayfactor(jet) )
-        #    exit(1)
 
         h_passleadjet['nominal'][lifetime].Fill(leadjetpt, tree.pass_nominal[lifetime])
         h_passleadjet['delayed_highpt'][lifetime].Fill(leadjetpt, tree.pass_delayed_highpt[lifetime])
@@ -479,7 +446,7 @@ def main():
         #    exit(1)
     
     leg = TLegend(0.1,0.5,0.5,0.9)
-    os.system('mkdir -p plots/%s'%sample)
+    os.system('mkdir -p plots_sample/%s'%sample)
     canv = TCanvas()
     line = TLine(0,1,maxjetpt,1)
     effs = {}
@@ -497,7 +464,7 @@ def main():
     canv.SetLogx()
     gPad.Update()
     effs[cuts[0]].GetPaintedGraph().GetYaxis().SetRangeUser(0,1.2)
-    canv.SaveAs("plots/%s/eff_lifetime.png"%sample)
+    canv.SaveAs("plots_sample/%s/eff_lifetime.png"%sample)
     canv.SetLogx(0)
     
     norm = nbins/4.
@@ -516,7 +483,7 @@ def main():
             effs_ht[cut].Draw("same LP")
         line.Draw()
         leg.Draw()
-        canv.SaveAs("plots/%s/eff_ht_%f.png"%(sample,lifetime))
+        canv.SaveAs("plots_sample/%s/eff_ht_%f.png"%(sample,lifetime))
     
         h = h_leadjet.DrawNormalized("",norm)
         h.GetYaxis().SetRangeUser(0,1.2)
@@ -528,7 +495,7 @@ def main():
             effs_lead[cut].Draw("same LP")
         line.Draw()
         leg.Draw()
-        canv.SaveAs("plots/%s/eff_lead_%f.png"%(sample,lifetime))
+        canv.SaveAs("plots_sample/%s/eff_lead_%f.png"%(sample,lifetime))
     
         h = h_leadN1jet.DrawNormalized("",norm)
         h.GetYaxis().SetRangeUser(0,1.2)
@@ -540,6 +507,6 @@ def main():
             effs_leadN1[cut].Draw("same LP")
         line.Draw()
         leg.Draw()
-        canv.SaveAs("plots/%s/eff_leadN1_%f.png"%(sample,lifetime))
+        canv.SaveAs("plots_sample/%s/eff_leadN1_%f.png"%(sample,lifetime))
 
 if __name__ == "__main__":  main()
