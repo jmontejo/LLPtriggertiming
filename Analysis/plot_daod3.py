@@ -132,28 +132,21 @@ def getLast(p):
 
 def getDecays(tree):
     toret = []
-    if hasattr(tree,'TruthBSMWithDecayParticles'):
-        for bsm in tree.TruthBSMWithDecayParticles:
-          if 'higgsino' in sample and bsm.status()==62:
-            toret.append([bsm])
-          elif 'hss' in sample and bsm.status()==22:
-            toret.append([bsm])
-          else: continue
-          toret[-1].extend([bsm.child(i) for i in range(bsm.nChildren())])
-          bsm4v = bsm.p4()
-          Rdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*sin(bsm4v.Theta()) )
-          Zdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*abs(cos(bsm4v.Theta()) ))
-          if len(toret)==2: break
-    else:
-        for bsm in tree.TruthBSM:
-            bsm4v = bsm.p4()
-            Rdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*sin(bsm4v.Theta()) )
-            Zdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*abs(cos(bsm4v.Theta()) ))
-            toret.append([bsm])
-            if len(toret)==2: break
+    for bsm in tree.TruthBSMWithDecayParticles:
+      if 'higgsino' in sample and bsm.status()==62:
+        toret.append([bsm])
+      elif 'hss' in sample and bsm.status()==22:
+        toret.append([bsm])
+      else: continue
+      toret[-1].extend([bsm.child(i) for i in range(bsm.nChildren())])
+      bsm4v = bsm.p4()
+      decaytime.set(bsm, rnd.Exp(1) )
+      Rdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*sin(bsm4v.Theta()) )
+      Zdisplacementfactor.set(bsm, bsm4v.Beta()* bsm4v.Gamma()*300*abs(cos(bsm4v.Theta()) ))
+      if len(toret)==2: break
     return toret
 
-def decorateJet(jet, dec1, dec2, todebug=None):
+def decorateJet(jet, dec1, dec2, pdgs=None):
     recopt.set(jet, truth2reco(jet.pt()*gev) )
     l1pt.set(jet, reco2l1(recopt(jet)) )
     flav = jet.auxdataConst['int']('TrueFlavor') 
@@ -175,25 +168,15 @@ def decorateJet(jet, dec1, dec2, todebug=None):
         n1 = dec2[0]
         n1index.set(jet, 1 )
     elif min(dr1,dr2) < 9 and min(dr1,dr2>0.6):
-        if 'higgsino' in sample and todebug.count(flav) <=2:
+        if 'higgsino' in sample and pdgs.count(flav) <=2:
             #print "No good dR matching",dr1,dr2,flav,jet.pt(),jet.eta(),jet.phi(),[(p.pdgId(), p.pt(), p.eta(),p.phi()) for p in dec1+dec2 if p.pdgId()==flav]
-            #print todebug
+            #print pdgs
             return False
-        if 'hss' in sample and todebug.count(flav) <=4:
+        if 'hss' in sample and pdgs.count(flav) <=4:
             return False
     if n1:
-        n14v = n1.p4()
-        delayfactor.set(jet, n14v.Gamma()*(1-n14v.Beta()*cos( n1.phi() -jet.phi() )))
-        #deltal = getDeltaL(jet, n1)
-        #time difference =  gamma*tau(1 - beta*cos) + sqrt( (beta*gamma*tau*sin)^2 + (d/c)^2 )  - d/c
-        Rdisplacementfactor.set(jet, n14v.Beta()* n14v.Gamma()*300*sin(n14v.Theta()) )
-        Zdisplacementfactor.set(jet, n14v.Beta()* n14v.Gamma()*300*abs(cos(n14v.Theta()) ))
-        #print "N1 pt, beta*gamma: ",n1.pt(), n14v.Beta()* n14v.Gamma()
         isN1decay.set(jet, 1 )
     else:
-        delayfactor.set(jet, 0 )
-        Rdisplacementfactor.set(jet, 0 )
-        Zdisplacementfactor.set(jet, 0 )
         isN1decay.set(jet, 0 )
     return True
 
@@ -207,10 +190,10 @@ def decorateJet(jet, dec1, dec2, todebug=None):
 # - nominal L1 + displaced HLT trigger cut B (jet pT > 2xx gev + jet pT > 40 and jet time > 2 sigma) ISR + delayed
 # - pileup L1 + displaced HLT trigger cut (pass L1 and jet time > 2 sigma) pass L1 = weight event by the prob that it passes L1 adding to PU
 
-def llpDelayProbability(lifetime, delayfactor, time_cutpoint):
-    if delayfactor==0: return 0 #if not delay cannot pass
+def llpDelayProbability(delay, time_cutpoint):
+    if delay==0: return 0 #if not delay cannot pass
     #integral of a normalized exponential with tau*delayfactor, from cutpoint to cutpoint_high
-    return exp(- time_cutpoint/(lifetime*delayfactor)) -exp(- time_cutpoint_high/(lifetime*delayfactor))
+    return exp(- time_cutpoint/delay) -exp(- time_cutpoint_high/delay)
 
 def llpDisplacementProbability(lifetime, jet, Rmin=0, Rmax=9e9, Zmin=0, Zmax=9e9, fiducial_range=None):
     if Rdisplacementfactor(jet)==0:
@@ -341,12 +324,12 @@ def passDelayed2(sortedjets, lifetime, ptcut=40, llps=None):
     for i1,jet1 in enumerate(sortedjets):
       if recopt(jet1) < ptcut: break
       n1factor1 = delayfactor(jet1)
-      factor1 = getDelayFactor(jet1, llps, lifetime) if llps else delayfactor(jet1)
+      factor1 = getDelay(jet1, llps, lifetime) if llps else delayfactor(jet1)
       for i2 in range(i1+1, len(sortedjets)):
         jet2 = sortedjets[i2]
         if recopt(jet2) < ptcut: break
         n1factor2 = delayfactor(jet2)
-        factor2 = getDelayFactor(jet2, llps, lifetime) if llps else delayfactor(jet2)
+        factor2 = getDelay(jet2, llps, lifetime) if llps else delayfactor(jet2)
         prob1 =  llpDelayProbability(lifetime, factor1, 1.5 )*llpDisplacementProbability(lifetime, jet1, fiducial_range='contained_for_delayed')
         prob2 =  llpDelayProbability(lifetime, factor2, 1.5 )*llpDisplacementProbability(lifetime, jet2, fiducial_range='contained_for_delayed')
         prob = prob1*prob2
@@ -358,14 +341,14 @@ def passDelayed2(sortedjets, lifetime, ptcut=40, llps=None):
     hltprob = 1-nonepass
     return hltprob
 
-def getDelayFactor(jet, llps, lifetime):
+def getDelay(jet, llps, lifetime):
     n1 = llps[ n1index(jet) ]
     n14v = n1.p4()
     length = 1500
     c = 300
     timediff = n14v.Gamma()*lifetime*(1-n14v.Beta()*cos( n1.phi() -jet.phi() )) + \
                sqrt( pow(n14v.Beta()*n14v.Gamma()*lifetime*sin( n1.phi() -jet.phi() ), 2) + pow(length/c,2) ) - length/c
-    return timediff/lifetime
+    return timediff
     
     #time difference =  gamma*tau(1 - beta*cos) + sqrt( (beta*gamma*tau*sin)^2 + (d/c)^2 )  - d/c
 
@@ -377,10 +360,7 @@ def passDelayed(sortedjets, lifetime, ptcut=40, llps=None):
       if recopt(jet) < ptcut: break
       factor = delayfactor(jet)
 
-      if llps:
-          prob =  llpDelayProbability(lifetime, getDelayFactor(jet, llps, lifetime), 2 )*llpDisplacementProbability(lifetime, jet, fiducial_range='contained_for_delayed')
-      else:
-          prob =  llpDelayProbability(lifetime, factor, 2)*llpDisplacementProbability(lifetime, jet, fiducial_range='contained_for_delayed')
+      prob =  llpDelayProbability(lifetime, getDelay(jet, llps, lifetime), 2 )*llpDisplacementProbability(lifetime, jet, fiducial_range='contained_for_delayed')
       if factor not in seenfactors or prob > seenfactors[factor]:
         seenfactors[factor] = prob
     for p in seenfactors.values():
