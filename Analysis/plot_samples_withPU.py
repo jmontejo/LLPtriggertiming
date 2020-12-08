@@ -51,8 +51,10 @@ variables = [
     Variable("pass_3J40","pass_3J40",(2,-0.5,1.5),4,60,6,60),
     Variable("pass_J85_3J30","pass_J85_3J30",(2,-0.5,1.5),4,60,6,60),
     Variable("n_jet","Jet_size",(10,-0.5,9.5),1,200,1,450),
+    Variable("htreco","htreco",(10,0,200),1,200,1,450),
     Variable("ht21","myHT21",(10,0,200),1,200,1,450),
     Variable("ht31","myHT31",(10,0,200),1,200,1,450),
+    Variable("htreco","htreco",(10,0,1000),1,200,1,450),
     Variable("jet_pt1","Jet.PT[0]",(10,0,200),1,200,1,450),
     Variable("jet_pt4","Jet.PT[3]",(10,0,200),4,60,4,120),
     Variable("jet_pt6","Jet.PT[5]",(5,0,100),4,60,6,60),
@@ -113,6 +115,7 @@ for (sample,weight,pujets) in sampleslist:
     tree.SetAlias("pass_HT21" ,"myHT21>190")
     tree.SetAlias("pass_HT31" ,"myHT31>150")
     tree.SetAlias("pass_J85_3J30" ,"L1jet0pt>85 && L1jet2pt>30")
+    tree.SetAlias("htreco" ,"Sum$(Jet.PT)")
 
     for var in variables:
         if not var in hists: hists[var] = collections.OrderedDict()
