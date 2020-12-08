@@ -8,9 +8,9 @@ gROOT.Macro('$ROOTCOREDIR/scripts/load_packages.C')
 # Initialize the xAOD infrastructure
 xAOD.Init()
 
-sample = 'higgsino_150'
 sample = 'higgs_ss35'
 sample = 'my_hss35'
+sample = 'higgsino_200'
 samples = {
     'higgsino_200':"/afs/cern.ch/work/j/jmontejo/LLPtriggertiming/LLPtrigger_samples/n3n4_1TeVsquark_200gev.DAOD_TRUTH3.root",
     'higgsino_150':"/afs/cern.ch/work/j/jmontejo/LLPtriggertiming/LLPtrigger_samples/n3n4_1TeVsquark_150gev.DAOD_TRUTH3.root",
@@ -186,8 +186,8 @@ def decorateJet(jet, dec1, dec2, todebug=None):
         delayfactor.set(jet, n14v.Gamma()*(1-n14v.Beta()*cos( n1.phi() -jet.phi() )))
         #deltal = getDeltaL(jet, n1)
         #time difference =  gamma*tau(1 - beta*cos) + sqrt( (beta*gamma*tau*sin)^2 + (d/c)^2 )  - d/c
-        Rdisplacementfactor.set(jet, n14v.Beta()* n14v.Gamma()*300*sin(n14v.Theta()) )
-        Zdisplacementfactor.set(jet, n14v.Beta()* n14v.Gamma()*300*abs(cos(n14v.Theta()) ))
+        Rdisplacementfactor.set(jet, Rdisplacementfactor(n1) )
+        Zdisplacementfactor.set(jet, Zdisplacementfactor(n1) )
         #print "N1 pt, beta*gamma: ",n1.pt(), n14v.Beta()* n14v.Gamma()
         isN1decay.set(jet, 1 )
     else:
@@ -423,12 +423,6 @@ def decorateEvent(tree, llps):
         tree.pass_delayed_PU[lifetime] = passl1*delayed
         tree.pass_tracking_PU[lifetime] = passl1*tracking
         tree.pass_CalRatio[lifetime] = passCalRatio(leadjetpt, llps,lifetime)
-        #if leadN1jetpt > 220:
-        #  if tree.pass_delayed_ISR[lifetime]> tree.pass_delayed_highpt[lifetime]:
-        #    print  tree.pass_delayed_ISR[lifetime],tree.pass_delayed_highpt[lifetime], delayed
-        #    for jet in sortedjets:
-        #        print recopt(jet), delayfactor(jet), llpDelayProbability(lifetime, delayfactor(jet) )
-        #    exit(1)
 
         h_passleadjet['nominal'][lifetime].Fill(leadjetpt, tree.pass_nominal[lifetime])
         h_passleadjet['delayed_highpt'][lifetime].Fill(leadjetpt, tree.pass_delayed_highpt[lifetime])
